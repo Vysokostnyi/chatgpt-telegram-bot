@@ -8,6 +8,7 @@ import os
 import base64
 
 import telegram
+from bd import  is_admin
 from telegram import Message, MessageEntity, Update, ChatMember, constants
 from telegram.ext import CallbackContext, ContextTypes
 
@@ -156,7 +157,7 @@ async def is_allowed(config, update: Update, context: CallbackContext, is_inline
         return True
 
     user_id = update.inline_query.from_user.id if is_inline else update.message.from_user.id
-    if is_admin(config, user_id):
+    if is_admin(user_id):
         return True
     name = update.inline_query.from_user.name if is_inline else update.message.from_user.name
     allowed_user_ids = config['allowed_user_ids'].split(',')
@@ -177,23 +178,23 @@ async def is_allowed(config, update: Update, context: CallbackContext, is_inline
     return False
 
 
-def is_admin(config, user_id: int, log_no_admin=False) -> bool:
-    """
-    Checks if the user is the admin of the bot.
-    The first user in the user list is the admin.
-    """
-    if config['admin_user_ids'] == '-':
-        if log_no_admin:
-            logging.info('No admin user defined.')
-        return False
-
-    admin_user_ids = config['admin_user_ids'].split(',')
-
-    # Check if user is in the admin user list
-    if str(user_id) in admin_user_ids:
-        return True
-
-    return False
+#def is_admin(config, user_id: int, log_no_admin=False) -> bool:
+#    """
+#    Checks if the user is the admin of the bot.
+#    The first user in the user list is the admin.
+#    """
+#    if config['admin_user_ids'] == '-':
+#        if log_no_admin:
+#            logging.info('No admin user defined.')
+#        return False
+#
+#    admin_user_ids = config['admin_user_ids'].split(',')
+#
+#    # Check if user is in the admin user list
+#    if str(user_id) in admin_user_ids:
+#        return True
+#
+#    return False
 
 
 def get_user_budget(config, user_id) -> float | None:
@@ -205,7 +206,7 @@ def get_user_budget(config, user_id) -> float | None:
     """
 
     # no budget restrictions for admins and '*'-budget lists
-    if is_admin(config, user_id) or config['user_budgets'] == '*':
+    if is_admin(user_id) or config['user_budgets'] == '*':
         return float('inf')
 
     user_budgets = config['user_budgets'].split(',')
@@ -228,14 +229,14 @@ def get_user_budget(config, user_id) -> float | None:
 
 def get_remaining_budget(config, usage, update: Update, is_inline=False) -> float:
     """
-    Calculate the remaining budget for a user based on their current usage.
-    :param config: The bot configuration object
-    :param usage: The usage tracker object
-    :param update: Telegram update object
-    :param is_inline: Boolean flag for inline queries
-    :return: The remaining budget for the user as a float
+    Рассчитать оставшийся бюджет для пользователя на основе их текущего использования.
+    :param config: Объект конфигурации бота
+    :param usage: Объект трекера использования
+    :param update: Объект обновления Telegram
+    :param is_inline: Логический флаг для встроенных запросов
+    :return: Оставшийся бюджет для пользователя в виде числа с плавающей запятой
     """
-    # Mapping of budget period to cost period
+    # Сопоставление периода бюджета с периодом стоимости
     budget_cost_map = {
         "monthly": "cost_month",
         "daily": "cost_today",
@@ -263,13 +264,13 @@ def get_remaining_budget(config, usage, update: Update, is_inline=False) -> floa
 
 def is_within_budget(config, usage, update: Update, is_inline=False) -> bool:
     """
-    Checks if the user reached their usage limit.
-    Initializes UsageTracker for user and guest when needed.
-    :param config: The bot configuration object
-    :param usage: The usage tracker object
-    :param update: Telegram update object
-    :param is_inline: Boolean flag for inline queries
-    :return: Boolean indicating if the user has a positive budget
+    Проверяет, достиг ли пользователь лимита использования.
+    При необходимости инициализирует UsageTracker для пользователя и гостя.
+    :param config: Объект конфигурации бота
+    :param usage: Объект трекера использования
+    :param update: Объект обновления Telegram
+    :param is_inline: Логический флаг для встроенных запросов
+    :return: Логическое значение, указывающее, есть ли у пользователя положительный бюджет
     """
     user_id = update.inline_query.from_user.id if is_inline else update.message.from_user.id
     name = update.inline_query.from_user.name if is_inline else update.message.from_user.name
@@ -281,24 +282,24 @@ def is_within_budget(config, usage, update: Update, is_inline=False) -> bool:
 
 def add_chat_request_to_usage_tracker(usage, config, user_id, used_tokens):
     """
-    Add chat request to usage tracker
-    :param usage: The usage tracker object
-    :param config: The bot configuration object
-    :param user_id: The user id
-    :param used_tokens: The number of tokens used
+    Добавить запрос чата в трекер использования
+    :param usage: Объект трекера использования
+    :param config: Объект конфигурации бота
+    :param user_id: Идентификатор пользователя
+    :param used_tokens: Количество использованных токенов
     """
     try:
         if int(used_tokens) == 0:
-            logging.warning('No tokens used. Not adding chat request to usage tracker.')
+            logging.warning('Токены не используются. Не добавлять запрос в чат в трекер использования.')
             return
-        # add chat request to users usage tracker
+        # добавить запрос чата в трекер использования пользователей
         usage[user_id].add_chat_tokens(used_tokens, config['token_price'])
-        # add guest chat request to guest usage tracker
+        # добавить запрос чата гостя в трекер использования гостей
         allowed_user_ids = config['allowed_user_ids'].split(',')
         if str(user_id) not in allowed_user_ids and 'guests' in usage:
             usage["guests"].add_chat_tokens(used_tokens, config['token_price'])
     except Exception as e:
-        logging.warning(f'Failed to add tokens to usage_logs: {str(e)}')
+        logging.warning(f'Не удалось добавить токены в Usage_logs: {str(e)}')
         pass
 
 

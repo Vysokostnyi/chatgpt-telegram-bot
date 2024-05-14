@@ -9,24 +9,27 @@ from telegram_bot import ChatGPTTelegramBot
 
 
 def main():
-    # Read .env file
-    load_dotenv()
+    # Загрузка API ключей из файла .env
+    load_dotenv()    
 
-    # Setup logging
+    # Настройка логирования
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    # Check if the required environment variables are set
+    # Проверка наличия обязательных переменных окружения
     required_values = ['TELEGRAM_BOT_TOKEN', 'OPENAI_API_KEY']
     missing_values = [value for value in required_values if os.environ.get(value) is None]
     if len(missing_values) > 0:
-        logging.error(f'The following environment values are missing in your .env: {", ".join(missing_values)}')
+        logging.error(f'Отсутствуют следующие значения переменных окружения в файле .env: {", ".join(missing_values)}')
         exit(1)
 
-    # Setup configurations
+    # Загрузка конфигурации бота из файла config.env
+    load_dotenv(dotenv_path="config.env")
+  
+    # Настройка конфигурации
     model = os.environ.get('OPENAI_MODEL', 'gpt-3.5-turbo')
     functions_available = are_functions_available(model=model)
     max_tokens_default = default_max_tokens(model=model)
@@ -63,15 +66,17 @@ def main():
     }
 
     if openai_config['enable_functions'] and not functions_available:
+
         logging.error(f'ENABLE_FUNCTIONS is set to true, but the model {model} does not support it. '
                         'Please set ENABLE_FUNCTIONS to false or use a model that supports it.')
         exit(1)
+        
     if os.environ.get('MONTHLY_USER_BUDGETS') is not None:
-        logging.warning('The environment variable MONTHLY_USER_BUDGETS is deprecated. '
-                        'Please use USER_BUDGETS with BUDGET_PERIOD instead.')
+      logging.warning('Переменная окружения MONTHLY_USER_BUDGETS устарела. '
+                      'Пожалуйста, используйте USER_BUDGETS с BUDGET_PERIOD вместо нее.')
     if os.environ.get('MONTHLY_GUEST_BUDGET') is not None:
-        logging.warning('The environment variable MONTHLY_GUEST_BUDGET is deprecated. '
-                        'Please use GUEST_BUDGET with BUDGET_PERIOD instead.')
+      logging.warning('Переменная окружения MONTHLY_GUEST_BUDGET устарела. '
+                      'Пожалуйста, используйте GUEST_BUDGET с BUDGET_PERIOD вместо нее.')
 
     telegram_config = {
         'token': os.environ['TELEGRAM_BOT_TOKEN'],
@@ -106,7 +111,7 @@ def main():
         'plugins': os.environ.get('PLUGINS', '').split(',')
     }
 
-    # Setup and run ChatGPT and Telegram bot
+    # Настройка и запуск ChatGPT и Telegram бота
     plugin_manager = PluginManager(config=plugin_config)
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)

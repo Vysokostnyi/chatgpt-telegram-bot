@@ -5,6 +5,7 @@ import logging
 import os
 import io
 
+from bd import add_user
 from uuid import uuid4
 from telegram import BotCommandScopeAllGroupChats, Update, constants
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
@@ -23,7 +24,22 @@ from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicato
 from openai_helper import OpenAIHelper, localized_text
 from usage_tracker import UsageTracker
 
+# Говно код ON
+def add_user_to_db(func):
+    """
+    Декоратор для автоматического добавления пользователя в базу данных перед выполнением команды.
+    """
+    async def wrapper(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user = update.message.from_user
+        user_id = user.id
+        username = user.username
+        first_name = user.first_name
+        last_name = user.last_name
+        add_user(user_id, username, first_name, last_name)
+        return await func(self, update, context, *args, **kwargs)
+    return wrapper
 
+# Говно код OFF  
 class ChatGPTTelegramBot:
     """
     Class representing a ChatGPT Telegram Bot.
@@ -59,11 +75,15 @@ class ChatGPTTelegramBot:
         self.usage = {}
         self.last_message = {}
         self.inline_queries_cache = {}
-
+      
+    @add_user_to_db
     async def help(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         """
         Shows the help menu.
         """
+        # Добавляем вызов функции для добавления пользователя в базу данных
+        #add_user(update.message.from_user.id, update.message.from_user.username, 
+        #         update.message.from_user.first_name, update.message.from_user.last_name)
         commands = self.group_commands if is_group_chat(update) else self.commands
         commands_description = [f'/{command.command} - {command.description}' for command in commands]
         bot_language = self.config['bot_language']
@@ -643,6 +663,7 @@ class ChatGPTTelegramBot:
 
         await wrap_with_indicator(update, context, _execute, constants.ChatAction.TYPING)
 
+    @add_user_to_db
     async def prompt(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         React to incoming messages and respond accordingly.
@@ -1074,6 +1095,7 @@ class ChatGPTTelegramBot:
             filters.VIDEO | filters.VIDEO_NOTE | filters.Document.VIDEO,
             self.transcribe))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self.prompt))
+        
         application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
             constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.PRIVATE
         ]))

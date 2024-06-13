@@ -1,6 +1,8 @@
 # Игнорируем файлы и директории repl.it
 /.replit
 /repl.it
+.replit
+replit.nix
 
 __pycache__
 /.idea
